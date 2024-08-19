@@ -58,7 +58,7 @@ void doit(int fd)
   printf("request headers:\n");
   printf("%s", buf);                             // 요청 헤더 출력
   sscanf(buf, "%s %s %s", method, uri, version); // 버퍼에서 데이터 읽고 method, uri, version에 저장
-  if (strcasecmp(method, "GET")) // GET 요청인지 확인
+  if (strcasecmp(method, "GET"))                 // GET 요청인지 확인
   {
     clienterror(fd, method, "501", "Not Implemented", "Tiny does not implement this method"); // 아니면 꺼지라고 함
     return;
@@ -72,12 +72,6 @@ void doit(int fd)
     clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file"); // 오류 나면 끝내기
     return;
   }
-
-  // if(strcasecmp(method, "HEAD"))
-  // {
-  //   serve_header(fd, filename, sbuf.st_size);
-  //   return;
-  // }
 
   if (is_static) // 정적 컨텐츠였다면
   {
@@ -177,24 +171,6 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
   }
 }
 
-
-/* 헤더 정보 전송 */
-// void serve_header(int fd, char *filename, int filesize)
-// {
-//   char filetype[MAXLINE], buf[MAXBUF];
-
-//   /* 응답 헤더를 클라에게 보낸다 */
-//   get_filetype(filename, filetype);
-//   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-//   sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-//   sprintf(buf, "%sConnection: close\r\n", buf);
-//   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
-//   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-//   rio_writen(fd, buf, strlen(buf)); // 헤더를 클라에게 전송
-//   printf("%s", buf); // 디버깅을 위해 헤더 출력
-// }
-
-
 /* 정적 컨텐츠 전송 */
 void serve_static(int fd, char *filename, int filesize)
 {
@@ -204,21 +180,23 @@ void serve_static(int fd, char *filename, int filesize)
   /* 응답 헤더를 클라에게 보낸다 */
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-  sprintf(buf, "%sConnection: close\r\n", buf);
-  sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
-  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-  rio_writen(fd, buf, strlen(buf)); // 헤더를 클라에게 전송
-  printf("%s", buf); // 디버깅을 위해 헤더 출력
+  sprintf(buf + strlen(buf), "Server: Tiny Web Server\r\n");
+  sprintf(buf + strlen(buf), "Connection: close\r\n");
+  sprintf(buf + strlen(buf), "Content-length: %d\r\n", filesize);
+  sprintf(buf + strlen(buf), "Content-type: %s\r\n\r\n", filetype); // 두 개의 개행이 중요합니다
+  rio_writen(fd, buf, strlen(buf)); // 클라이언트로 응답 헤더 전송
+
+  printf("Response headers:\n"); // 디버깅을 위해 헤더 출력
+  printf("%s", buf); 
 
   /* 응답 body를 클라에 보낸다 */
   srcfd = open(filename, O_RDONLY, 0); // 파일을 읽기 전용 ('O_RDONLY')로 연다
-  // srcp = mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  srcp = mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   // 파일 내용을 메모리에 매핑, srcp는 매핑된 메모리의 시작 주소
   // PROT_READ: 매핑된 메모리 영역을 읽기 전용으로 설정
   // MAP_PRIVATE: 메모리의 변경 사항이 파일에 반영되지 않고, 다른 프로세스와 공유되지 않음
-  srcp = malloc(filesize);
-  rio_readn(srcfd, srcp, filesize);  
+  // srcp = malloc(filesize);
+  // rio_readn(srcfd, srcp, filesize);  
   close(srcfd); // 파일 식별자 닫기
   rio_writen(fd, srcp, filesize); // 클라에게 파일 데이터 전송
   munmap(srcp, filesize); // 할당했던 메모리 반환
