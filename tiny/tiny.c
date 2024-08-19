@@ -11,6 +11,7 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
+void serve_header(int fd, char *filename, int filesize);
 void serve_static(int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
@@ -58,7 +59,7 @@ void doit(int fd)
   printf("request headers:\n");
   printf("%s", buf);                             // 요청 헤더 출력
   sscanf(buf, "%s %s %s", method, uri, version); // 버퍼에서 데이터 읽고 method, uri, version에 저장
-  if (strcasecmp(method, "GET"))                 // GET 요청인지 확인
+  if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD")) // GET 요청인지 확인
   {
     clienterror(fd, method, "501", "Not Implemented", "Tiny does not implement this method"); // 아니면 꺼지라고 함
     return;
@@ -70,6 +71,17 @@ void doit(int fd)
   if (stat(filename, &sbuf) < 0)                 // 파일 읽어서 버퍼에 넣기
   {
     clienterror(fd, filename, "404", "Not found", "Tiny couldn't find this file"); // 오류 나면 끝내기
+    return;
+  }
+
+  if (!strcasecmp(method, "HEAD")) // HEAD 요청이라면
+  {
+    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode))
+    {
+      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
+      return;
+    }
+    serve_header(fd, filename, sbuf.st_size);
     return;
   }
 
@@ -169,6 +181,25 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
     strcat(filename, uri); // .uri 만들기
     return 0;
   }
+}
+
+/* 헤더 전송 */
+void serve_header(int fd, char *filename, int filesize)
+{
+  int srcfd; // 파일 식별자 저장
+  char *srcp, filetype[MAXLINE], buf[MAXBUF];
+
+  /* 응답 헤더를 클라에게 보낸다 */
+  get_filetype(filename, filetype);
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  sprintf(buf + strlen(buf), "Server: Tiny Web Server\r\n");
+  sprintf(buf + strlen(buf), "Connection: close\r\n");
+  sprintf(buf + strlen(buf), "Content-length: %d\r\n", filesize);
+  sprintf(buf + strlen(buf), "Content-type: %s\r\n\r\n", filetype); // 두 개의 개행이 중요합니다
+  rio_writen(fd, buf, strlen(buf)); // 클라이언트로 응답 헤더 전송
+
+  printf("Response headers:\n"); // 디버깅을 위해 헤더 출력
+  printf("%s", buf); 
 }
 
 /* 정적 컨텐츠 전송 */
