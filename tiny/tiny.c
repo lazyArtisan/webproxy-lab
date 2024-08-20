@@ -57,7 +57,7 @@ void doit(int fd)
   rio_readinitb(&rio, fd);           // 읽기 함수에 쓰일 변수들 초기화
   rio_readlineb(&rio, buf, MAXLINE); // 버퍼에 들어온 것들 읽기
   printf("request headers:\n");
-  printf("%s", buf);                             // 요청 헤더 출력
+  printf("%s", buf);                             // 요청 라인 출력
   sscanf(buf, "%s %s %s", method, uri, version); // 버퍼에서 데이터 읽고 method, uri, version에 저장
   if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD")) // GET 요청인지 확인
   {
