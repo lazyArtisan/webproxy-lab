@@ -85,6 +85,8 @@ void doit(int fd)
     return;
   }
 
+  serve_header(fd, filename, sbuf.st_size);
+
   if (is_static) // 정적 컨텐츠였다면
   {
     /* 일반 파일인지, 실행 권한이 있는지 확인 */
